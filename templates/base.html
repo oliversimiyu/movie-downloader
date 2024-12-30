@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Movie Downloader{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        /* Dark mode styles */
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f3f4f6;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --border-color: #e5e7eb;
+        }
+
+        .dark {
+            --bg-primary: #1f2937;
+            --bg-secondary: #111827;
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --border-color: #374151;
+        }
+
+        body {
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .card-bg {
+            background-color: var(--bg-primary);
+        }
+
+        .border-color {
+            border-color: var(--border-color);
+        }
+
+        .text-color-secondary {
+            color: var(--text-secondary);
+        }
+
+        /* Theme toggle switch */
+        .theme-toggle {
+            position: relative;
+            width: 3rem;
+            height: 1.5rem;
+        }
+
+        .theme-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .theme-toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #4b5563;
+            transition: .4s;
+            border-radius: 1.5rem;
+        }
+
+        .theme-toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 1.25rem;
+            width: 1.25rem;
+            left: 0.125rem;
+            bottom: 0.125rem;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        .theme-toggle input:checked + .theme-toggle-slider {
+            background-color: #8b5cf6;
+        }
+
+        .theme-toggle input:checked + .theme-toggle-slider:before {
+            transform: translateX(1.5rem);
+        }
+
+        /* Navigation styles */
+        .nav-container {
+            padding: 0.5rem 1rem;
+        }
+
+        @media (min-width: 640px) {
+            .nav-container {
+                padding: 0 1.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .nav-title {
+                font-size: 1rem;
+            }
+            
+            .welcome-text {
+                display: none;
+            }
+
+            .logout-btn {
+                padding: 0.5rem;
+                font-size: 0.75rem;
+            }
+        }
+
+        {% block extra_styles %}{% endblock %}
+    </style>
+</head>
+<body>
+    <nav class="card-bg shadow-lg sticky top-0 z-50 border-b border-color">
+        <div class="nav-container max-w-7xl mx-auto">
+            <div class="flex items-center justify-between h-14 sm:h-16">
+                <div class="flex items-center">
+                    <a href="/" class="nav-title text-lg sm:text-xl font-semibold hover:text-purple-600 transition-colors truncate">
+                        <i class="fas fa-film mr-2"></i>Movie Downloader
+                    </a>
+                </div>
+                <div class="flex items-center space-x-2 sm:space-x-4">
+                    <label class="theme-toggle">
+                        <input type="checkbox" id="themeToggle">
+                        <span class="theme-toggle-slider">
+                            <i class="fas fa-sun text-yellow-400 absolute left-1 top-1 text-xs"></i>
+                            <i class="fas fa-moon text-gray-200 absolute right-1 top-1 text-xs"></i>
+                        </span>
+                    </label>
+                    {% if session.get('user_id') %}
+                        <span class="welcome-text text-color-secondary text-sm sm:text-base">
+                            <i class="fas fa-user mr-1"></i>Welcome, {{ username }}!
+                        </span>
+                        <a href="/profile" class="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
+                            <i class="fas fa-user-cog mr-1"></i>Profile
+                        </a>
+                        <a href="/logout" class="logout-btn inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
+                            <i class="fas fa-sign-out-alt mr-1"></i>Logout
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    {% block content %}{% endblock %}
+
+    <script>
+        // Theme toggle functionality
+        const themeToggle = document.getElementById('themeToggle');
+        const html = document.documentElement;
+
+        // Load saved theme preference
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+            html.className = savedTheme;
+            themeToggle.checked = savedTheme === 'dark';
+        } else {
+            // Check system preference
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                html.className = 'dark';
+                themeToggle.checked = true;
+            }
+        }
+
+        // Theme toggle handler
+        themeToggle.addEventListener('change', function() {
+            if (this.checked) {
+                html.className = 'dark';
+                localStorage.setItem('theme', 'dark');
+            } else {
+                html.className = 'light';
+                localStorage.setItem('theme', 'light');
+            }
+        });
+    </script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

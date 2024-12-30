@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+
+{% block extra_styles %}
+.movie-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.5rem;
+    padding: 1.5rem;
+    width: 100%;
+    max-width: 1536px;
+    margin: 0 auto;
+}
+
+.movie-card {
+    background: var(--bg-primary);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-color);
+}
+
+.movie-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+}
+
+.movie-poster {
+    position: relative;
+    padding-top: 150%;
+    background: var(--bg-secondary);
+}
+
+.movie-poster img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+}
+
+.movie-info {
+    padding: 1rem;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.movie-title {
+    font-weight: 600;
+    font-size: 1rem;
+    line-height: 1.4;
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    color: var(--text-primary);
+}
+
+.movie-year {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.movie-rating {
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.search-container {
+    width: 100%;
+    max-width: 36rem;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.search-input-container {
+    display: flex;
+    gap: 0.5rem;
+    background: var(--bg-primary);
+    padding: 0.5rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--border-color);
+}
+
+#searchInput {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+#searchInput:focus {
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.1);
+}
+
+@media (max-width: 640px) {
+    .movie-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+        padding: 1rem;
+    }
+
+    .movie-title {
+        font-size: 0.875rem;
+    }
+
+    .search-container {
+        margin: 1rem auto;
+    }
+}
+{% endblock %}
+
+{% block content %}
+<div class="w-full">
+    <div class="search-container">
+        <div class="search-input-container">
+            <input type="text" 
+                   id="searchInput" 
+                   placeholder="Search for public domain movies..." 
+                   class="flex-1">
+            <button onclick="searchMovies()" 
+                    class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                <i class="fas fa-search mr-1"></i>Search
+            </button>
+        </div>
+    </div>
+
+    <div id="loadingSpinner" class="hidden">
+        <div class="spinner animate-spin"></div>
+    </div>
+
+    <div class="flex justify-center">
+        <div id="movieGrid" class="movie-grid">
+            <!-- Movies will be dynamically inserted here -->
+        </div>
+    </div>
+</div>
+
+<div id="movieModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center p-4">
+    <div class="modal-content bg-white rounded-lg p-6">
+        <div id="movieDetails" class="space-y-4">
+            <!-- Movie details will be dynamically added here -->
+        </div>
+        <div class="mt-6 flex justify-end space-x-4">
+            <button onclick="closeModal()" 
+                    class="px-4 py-2 text-gray-600 hover:text-gray-800">
+                Close
+            </button>
+            <button onclick="downloadMovie()" 
+                    class="px-4 py-2 gradient-bg text-white rounded-md hover:opacity-90">
+                Download
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Global variables
+    let currentMovie = null;
+    const backupPosters = {
+        'night-of-the-living-dead': 'https://archive.org/services/img/night_of_the_living_dead',
+        'metropolis': 'https://archive.org/services/img/metropolis1927germanversion',
+        'nosferatu': 'https://archive.org/services/img/Nosferatu_201604',
+        'the-general': 'https://archive.org/services/img/TheGeneral_981',
+        'plan-9-from-outer-space': 'https://archive.org/services/img/Plan9FromOuterSpace_657',
+        'little-shop-of-horrors': 'https://archive.org/services/img/little_shop_of_horrors',
+        'his-girl-friday': 'https://archive.org/services/img/his_girl_friday',
+        'charade': 'https://archive.org/services/img/charade_202006',
+        'carnival-of-souls': 'https://archive.org/services/img/carnival_of_souls',
+        'the-kid': 'https://archive.org/services/img/the_kid_chaplin',
+        'the-phantom-of-the-opera': 'https://archive.org/services/img/phantom_of_the_opera',
+        'dementia-13': 'https://archive.org/services/img/dementia_13'
+    };
+
+    // Function declarations
+    async function searchMovies() {
+        const searchInput = document.getElementById('searchInput');
+        const query = searchInput.value.trim();
+        
+        document.getElementById('loadingSpinner').classList.remove('hidden');
+        
+        try {
+            const response = await fetch('/search_movies' + (query ? `?query=${encodeURIComponent(query)}` : ''));
+            if (!response.ok) throw new Error('Search failed');
+            const movies = await response.json();
+            displayMovies(movies);
+        } catch (error) {
+            console.error('Error:', error);
+            document.getElementById('movieGrid').innerHTML = `
+                <div class="col-span-full text-center text-red-500 py-8">
+                    Error loading movies. Please try again.
+                </div>
+            `;
+        } finally {
+            document.getElementById('loadingSpinner').classList.add('hidden');
+        }
+    }
+
+    function displayMovies(movies) {
+        const grid = document.getElementById('movieGrid');
+        
+        if (!movies || movies.length === 0) {
+            grid.innerHTML = `
+                <div class="col-span-full text-center text-gray-500 py-8">
+                    No movies found. Try a different search term.
+                </div>
+            `;
+            return;
+        }
+
+        grid.innerHTML = '';
+        movies.forEach(movie => {
+            const card = document.createElement('div');
+            card.className = 'movie-card cursor-pointer';
+            card.onclick = () => showMovieDetails(movie.id);
+
+            const posterUrl = movie.poster_path || backupPosters[movie.id] || 'https://via.placeholder.com/300x450?text=No+Poster';
+            
+            card.innerHTML = `
+                <div class="movie-poster">
+                    <img src="${posterUrl}" 
+                         alt="${movie.title}" 
+                         onerror="this.onerror=null; this.src=(${JSON.stringify(backupPosters)}['${movie.id}'] || 'https://via.placeholder.com/300x450?text=No+Poster');">
+                </div>
+                <div class="movie-info">
+                    <h3 class="movie-title">${movie.title}</h3>
+                    <p class="movie-year"><i class="far fa-calendar-alt mr-1"></i>${movie.release_date || 'N/A'}</p>
+                    <div class="movie-rating">
+                        <i class="fas fa-star text-yellow-400 mr-1"></i>
+                        <span>${movie.vote_average.toFixed(1)}</span>
+                    </div>
+                </div>
+            `;
+
+            grid.appendChild(card);
+        });
+    }
+
+    async function showMovieDetails(movieId) {
+        try {
+            const response = await fetch(`/movie/${movieId}`);
+            if (!response.ok) throw new Error('Failed to fetch movie details');
+            const movie = await response.json();
+            currentMovie = movie;
+
+            const modal = document.getElementById('movieModal');
+            const detailsDiv = document.getElementById('movieDetails');
+            
+            detailsDiv.innerHTML = `
+                <h2 class="text-2xl font-bold mb-4">${movie.title}</h2>
+                <p class="text-gray-600 mb-4">${movie.description || 'No description available.'}</p>
+                <div class="flex items-center mb-4">
+                    <i class="fas fa-star text-yellow-400 mr-1"></i>
+                    <span>${movie.vote_average.toFixed(1)}</span>
+                </div>
+            `;
+
+            modal.classList.remove('hidden');
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Failed to load movie details');
+        }
+    }
+
+    function closeModal() {
+        const modal = document.getElementById('movieModal');
+        modal.classList.add('hidden');
+        currentMovie = null;
+    }
+
+    async function downloadMovie() {
+        if (!currentMovie) return;
+
+        const statusDiv = document.createElement('div');
+        statusDiv.className = 'mt-4 text-center';
+        statusDiv.innerHTML = '<div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto"></div><p class="mt-2">Starting download...</p>';
+        document.getElementById('movieDetails').appendChild(statusDiv);
+
+        try {
+            const response = await fetch('/download', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ movie_id: currentMovie.id })
+            });
+
+            if (!response.ok) throw new Error('Download request failed');
+            const result = await response.json();
+
+            if (result.success) {
+                statusDiv.innerHTML = '<p class="text-green-500">Download completed successfully!</p>';
+            } else {
+                throw new Error(result.error || 'Download failed');
+            }
+        } catch (error) {
+            statusDiv.innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
+        }
+    }
+
+    // Initialize when DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+        searchMovies();
+    });
+</script>
+{% endblock %}
