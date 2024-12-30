@@ -2,7 +2,7 @@
 
 A simple and modern web application for downloading movies and videos using yt-dlp.
 
-Last updated: 2024-12-30 10:22:23 UTC+03:00
+Last updated: 2024-12-30 10:25:10 UTC+03:00
 
 ## Features
 
