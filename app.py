@@ -157,6 +157,17 @@ def index():
 @app.route('/search_movies')
 def search_movies_route():
     try:
+        # Get the authorization token from the request headers
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({'error': 'No authorization token provided'}), 401
+
+        # Use the token from the request headers
+        headers = {
+            'Authorization': auth_header,
+            'Content-Type': 'application/json;charset=utf-8'
+        }
+
         query = request.args.get('query', '')
         page = request.args.get('page', 1, type=int)
         
@@ -176,8 +187,8 @@ def search_movies_route():
                 'language': 'en-US'
             }
         
-        # Make the API request
-        response = requests.get(endpoint, params=params, headers=TMDB_HEADERS)
+        # Make the API request with the token from the request headers
+        response = requests.get(endpoint, params=params, headers=headers)
         
         # Check for specific error responses
         if response.status_code == 401:
