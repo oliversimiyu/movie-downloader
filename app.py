@@ -60,9 +60,21 @@ class User(UserMixin, db.Model):
 
     def set_password(self, password):
         self.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
-
+    
     def check_password(self, password):
         return bcrypt.check_password_hash(self.password_hash, password)
+
+    def is_authenticated(self):
+        return True
+
+    def is_active(self):
+        return True
+
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+        return str(self.id)
 
 class Download(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -144,6 +156,7 @@ def get_movie_details(movie_id):
         return None
 
 @app.route('/')
+@login_required
 def index():
     query = request.args.get('query', '')
     page = request.args.get('page', 1, type=int)
@@ -316,6 +329,10 @@ def signup():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # Redirect if user is already logged in
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+        
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
@@ -323,7 +340,8 @@ def login():
 
         if user and user.check_password(password):
             login_user(user)
-            return redirect(url_for('index'))
+            next_page = request.args.get('next')
+            return redirect(next_page if next_page else url_for('index'))
         else:
             flash('Invalid username or password')
 

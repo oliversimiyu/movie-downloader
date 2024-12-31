@@ -133,14 +133,14 @@
                             <i class="fas fa-moon text-gray-200 absolute right-1 top-1 text-xs"></i>
                         </span>
                     </label>
-                    {% if session.get('user_id') %}
+                    {% if current_user.is_authenticated %}
                         <span class="welcome-text text-color-secondary text-sm sm:text-base">
-                            <i class="fas fa-user mr-1"></i>Welcome, {{ username }}!
+                            <i class="fas fa-user mr-1"></i>Welcome, {{ current_user.username }}!
                         </span>
-                        <a href="/profile" class="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
+                        <a href="{{ url_for('profile') }}" class="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
                             <i class="fas fa-user-cog mr-1"></i>Profile
                         </a>
-                        <a href="/logout" class="logout-btn inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
+                        <a href="{{ url_for('logout') }}" class="logout-btn inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
                             <i class="fas fa-sign-out-alt mr-1"></i>Logout
                         </a>
                     {% endif %}
