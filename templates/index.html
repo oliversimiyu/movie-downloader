@@ -130,198 +130,386 @@
 {% endblock %}
 
 {% block content %}
-<div class="w-full">
-    <div class="search-container">
-        <div class="search-input-container">
+<div class="container mx-auto px-4 py-8">
+    <!-- Search Section -->
+    <div class="flex flex-col items-center mb-8">
+        <h1 class="text-3xl font-bold mb-6 text-center">Movie Search</h1>
+        <div class="w-full max-w-2xl relative">
             <input type="text" 
                    id="searchInput" 
-                   placeholder="Search for public domain movies..." 
-                   class="flex-1">
+                   class="w-full px-4 py-2 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:outline-none"
+                   placeholder="Search for movies...">
             <button onclick="searchMovies()" 
-                    class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
-                <i class="fas fa-search mr-1"></i>Search
+                    class="absolute right-2 top-1/2 transform -translate-y-1/2 px-4 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+                <i class="fas fa-search"></i>
             </button>
         </div>
     </div>
 
-    <div id="loadingSpinner" class="hidden">
-        <div class="spinner animate-spin"></div>
+    <!-- Loading Spinner -->
+    <div id="loadingSpinner" class="hidden flex justify-center items-center py-8">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
     </div>
 
-    <div class="flex justify-center">
-        <div id="movieGrid" class="movie-grid">
-            <!-- Movies will be dynamically inserted here -->
+    <!-- Movie Grid -->
+    <div id="movieGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+        <!-- Movies will be dynamically added here -->
+    </div>
+</div>
+
+<!-- Movie Details Modal -->
+<div id="movieModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">Movie Details</h2>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="movieDetails" class="space-y-4">
+                <!-- Movie details will be inserted here -->
+            </div>
+            <div class="mt-6 flex justify-end gap-4">
+                <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                    Close
+                </button>
+                <button onclick="downloadMovie()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                    <i class="fas fa-info-circle mr-2"></i>View Providers
+                </button>
+            </div>
         </div>
     </div>
 </div>
 
-<div id="movieModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center p-4">
-    <div class="modal-content bg-white rounded-lg p-6">
-        <div id="movieDetails" class="space-y-4">
-            <!-- Movie details will be dynamically added here -->
-        </div>
-        <div class="mt-6 flex justify-end space-x-4">
-            <button onclick="closeModal()" 
-                    class="px-4 py-2 text-gray-600 hover:text-gray-800">
-                Close
-            </button>
-            <button onclick="downloadMovie()" 
-                    class="px-4 py-2 gradient-bg text-white rounded-md hover:opacity-90">
-                Download
-            </button>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
     // Global variables
     let currentMovie = null;
-    const backupPosters = {
-        'night-of-the-living-dead': 'https://archive.org/services/img/night_of_the_living_dead',
-        'metropolis': 'https://archive.org/services/img/metropolis1927germanversion',
-        'nosferatu': 'https://archive.org/services/img/Nosferatu_201604',
-        'the-general': 'https://archive.org/services/img/TheGeneral_981',
-        'plan-9-from-outer-space': 'https://archive.org/services/img/Plan9FromOuterSpace_657',
-        'little-shop-of-horrors': 'https://archive.org/services/img/little_shop_of_horrors',
-        'his-girl-friday': 'https://archive.org/services/img/his_girl_friday',
-        'charade': 'https://archive.org/services/img/charade_202006',
-        'carnival-of-souls': 'https://archive.org/services/img/carnival_of_souls',
-        'the-kid': 'https://archive.org/services/img/the_kid_chaplin',
-        'the-phantom-of-the-opera': 'https://archive.org/services/img/phantom_of_the_opera',
-        'dementia-13': 'https://archive.org/services/img/dementia_13'
-    };
+    let currentPage = 1;
+    let totalPages = 1;
 
     // Function declarations
     async function searchMovies() {
         const searchInput = document.getElementById('searchInput');
-        const query = searchInput.value.trim();
-        
-        document.getElementById('loadingSpinner').classList.remove('hidden');
+        const movieGrid = document.getElementById('movieGrid');
+        const loadingSpinner = document.getElementById('loadingSpinner');
         
         try {
-            const response = await fetch('/search_movies' + (query ? `?query=${encodeURIComponent(query)}` : ''));
-            if (!response.ok) throw new Error('Search failed');
-            const movies = await response.json();
-            displayMovies(movies);
+            loadingSpinner.classList.remove('hidden');
+            movieGrid.innerHTML = '';
+
+            
+            const TMDB_ACCESS_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJjMTM2OGQxNWZlYTEzNzk5YmU3NTMwNjlmNjNiMzdhZCIsInN1YiI6IjY1OTAzMzdhNjNlNmZiMDI0ZlZmMSIsImlhdCI6MTcwNDAwNDQ0MCwiZXhwIjo0OTYwMzc4MDQwfQ';
+            
+            
+            const query = searchInput.value.trim();
+            loadingSpinner.classList.remove('hidden');
+            movieGrid.innerHTML = '';
+            
+            const response = await fetch(`/search_movies?query=${encodeURIComponent(query)}&page=${currentPage}`, {
+                headers: {
+                    'Authorization': `Bearer ${TMDB_ACCESS_TOKEN}`
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to fetch movies');
+            }
+            
+            if (!data.results || data.results.length === 0) {
+                movieGrid.innerHTML = `
+                    <div class="col-span-full text-center text-gray-500 py-8">
+                        No movies found. Try a different search term.
+                    </div>
+                `;
+                return;
+            }
+            
+            // Update pagination info
+            totalPages = data.total_pages;
+            
+            // Display movies
+            data.results.forEach(movie => {
+                const movieCard = document.createElement('div');
+                movieCard.className = 'movie-card cursor-pointer transform transition-all duration-300 hover:scale-105';
+                movieCard.onclick = () => showMovieDetails(movie.id);
+                
+                const releaseYear = movie.release_date ? new Date(movie.release_date).getFullYear() : 'N/A';
+                const rating = movie.vote_average ? (movie.vote_average / 2).toFixed(1) : 'N/A';
+                
+                movieCard.innerHTML = `
+                    <div class="relative rounded-lg overflow-hidden shadow-lg bg-white">
+                        <img src="${movie.poster_path || '/static/placeholder.jpg'}" 
+                             alt="${movie.title}"
+                             class="w-full h-[400px] object-cover"
+                             onerror="this.src='/static/placeholder.jpg'">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <div class="absolute bottom-0 left-0 right-0 p-4 text-white">
+                                <h3 class="text-lg font-semibold line-clamp-2">${movie.title}</h3>
+                                <div class="flex items-center justify-between mt-2">
+                                    <span class="text-sm">${releaseYear}</span>
+                                    <div class="flex items-center">
+                                        <i class="fas fa-star text-yellow-400 mr-1"></i>
+                                        <span class="text-sm">${rating}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                movieGrid.appendChild(movieCard);
+            });
+            
+            // Update pagination
+            updatePagination();
+            
         } catch (error) {
-            console.error('Error:', error);
-            document.getElementById('movieGrid').innerHTML = `
+            console.error('Error searching movies:', error);
+            movieGrid.innerHTML = `
                 <div class="col-span-full text-center text-red-500 py-8">
-                    Error loading movies. Please try again.
+                    ${error.message || 'Error loading movies. Please try again.'}
                 </div>
             `;
         } finally {
-            document.getElementById('loadingSpinner').classList.add('hidden');
+            loadingSpinner.classList.add('hidden');
         }
     }
 
     function displayMovies(movies) {
-        const grid = document.getElementById('movieGrid');
+        const movieGrid = document.getElementById('movieGrid');
+        movieGrid.innerHTML = '';
         
         if (!movies || movies.length === 0) {
-            grid.innerHTML = `
-                <div class="col-span-full text-center text-gray-500 py-8">
-                    No movies found. Try a different search term.
-                </div>
-            `;
+            movieGrid.innerHTML = '<p class="text-center text-gray-500 col-span-full p-4">No movies found.</p>';
             return;
         }
-
-        grid.innerHTML = '';
+        
         movies.forEach(movie => {
-            const card = document.createElement('div');
-            card.className = 'movie-card cursor-pointer';
-            card.onclick = () => showMovieDetails(movie.id);
-
-            const posterUrl = movie.poster_path || backupPosters[movie.id] || 'https://via.placeholder.com/300x450?text=No+Poster';
+            const movieCard = document.createElement('div');
+            movieCard.className = 'movie-card';
+            movieCard.onclick = () => showMovieDetails(movie.id);
             
-            card.innerHTML = `
-                <div class="movie-poster">
-                    <img src="${posterUrl}" 
-                         alt="${movie.title}" 
-                         onerror="this.onerror=null; this.src=(${JSON.stringify(backupPosters)}['${movie.id}'] || 'https://via.placeholder.com/300x450?text=No+Poster');">
-                </div>
-                <div class="movie-info">
-                    <h3 class="movie-title">${movie.title}</h3>
-                    <p class="movie-year"><i class="far fa-calendar-alt mr-1"></i>${movie.release_date || 'N/A'}</p>
-                    <div class="movie-rating">
-                        <i class="fas fa-star text-yellow-400 mr-1"></i>
-                        <span>${movie.vote_average.toFixed(1)}</span>
+            const releaseYear = movie.release_date ? new Date(movie.release_date).getFullYear() : 'N/A';
+            const rating = movie.vote_average ? (movie.vote_average / 2).toFixed(1) : 'N/A';
+            
+            movieCard.innerHTML = `
+                <div class="relative group">
+                    <img src="${movie.poster_path || '/static/placeholder.jpg'}" 
+                         alt="${movie.title}"
+                         class="w-full h-[300px] object-cover rounded-lg shadow-lg transform transition-transform duration-200 group-hover:scale-105"
+                         onerror="this.src='/static/placeholder.jpg'">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg">
+                        <div class="absolute bottom-0 left-0 right-0 p-4 text-white">
+                            <h3 class="text-lg font-semibold">${movie.title}</h3>
+                            <div class="flex items-center justify-between mt-2">
+                                <span>${releaseYear}</span>
+                                <span class="flex items-center">
+                                    <i class="fas fa-star text-yellow-400 mr-1"></i>
+                                    ${rating}
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
-
-            grid.appendChild(card);
+            
+            movieGrid.appendChild(movieCard);
         });
+    }
+
+    function updatePagination() {
+        // Add pagination controls if needed
+        if (totalPages > 1) {
+            const paginationDiv = document.createElement('div');
+            paginationDiv.className = 'flex justify-center gap-2 mt-4';
+            
+            // Previous button
+            if (currentPage > 1) {
+                const prevButton = document.createElement('button');
+                prevButton.className = 'px-3 py-1 bg-gray-200 rounded hover:bg-gray-300';
+                prevButton.innerHTML = '←';
+                prevButton.onclick = () => {
+                    currentPage--;
+                    searchMovies();
+                };
+                paginationDiv.appendChild(prevButton);
+            }
+            
+            // Page numbers
+            for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) {
+                const pageButton = document.createElement('button');
+                pageButton.className = `px-3 py-1 rounded ${i === currentPage ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'}`;
+                pageButton.textContent = i;
+                pageButton.onclick = () => {
+                    currentPage = i;
+                    searchMovies();
+                };
+                paginationDiv.appendChild(pageButton);
+            }
+            
+            // Next button
+            if (currentPage < totalPages) {
+                const nextButton = document.createElement('button');
+                nextButton.className = 'px-3 py-1 bg-gray-200 rounded hover:bg-gray-300';
+                nextButton.innerHTML = '→';
+                nextButton.onclick = () => {
+                    currentPage++;
+                    searchMovies();
+                };
+                paginationDiv.appendChild(nextButton);
+            }
+            
+            document.getElementById('movieGrid').after(paginationDiv);
+        }
     }
 
     async function showMovieDetails(movieId) {
         try {
             const response = await fetch(`/movie/${movieId}`);
-            if (!response.ok) throw new Error('Failed to fetch movie details');
             const movie = await response.json();
-            currentMovie = movie;
-
-            const modal = document.getElementById('movieModal');
-            const detailsDiv = document.getElementById('movieDetails');
             
-            detailsDiv.innerHTML = `
-                <h2 class="text-2xl font-bold mb-4">${movie.title}</h2>
-                <p class="text-gray-600 mb-4">${movie.description || 'No description available.'}</p>
-                <div class="flex items-center mb-4">
-                    <i class="fas fa-star text-yellow-400 mr-1"></i>
-                    <span>${movie.vote_average.toFixed(1)}</span>
+            if (!movie) {
+                console.error('Movie details not found');
+                return;
+            }
+            
+            currentMovie = movie;
+            
+            const modalContent = document.getElementById('movieDetails');
+            const releaseYear = movie.release_date ? new Date(movie.release_date).getFullYear() : 'N/A';
+            const rating = movie.vote_average ? (movie.vote_average / 2).toFixed(1) : 'N/A';
+            
+            modalContent.innerHTML = `
+                <div class="flex flex-col md:flex-row gap-6">
+                    <div class="w-full md:w-1/3">
+                        <img src="${movie.poster_path || '/static/placeholder.jpg'}" 
+                             alt="${movie.title}"
+                             class="w-full rounded-lg shadow-lg"
+                             onerror="this.src='/static/placeholder.jpg'">
+                    </div>
+                    <div class="flex-1">
+                        <h2 class="text-2xl font-bold mb-2">${movie.title}</h2>
+                        <p class="text-gray-600 mb-4">${movie.tagline || ''}</p>
+                        <div class="space-y-4">
+                            <p>${movie.overview}</p>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <span class="font-semibold">Release Date:</span>
+                                    <span>${movie.release_date || 'N/A'}</span>
+                                </div>
+                                <div>
+                                    <span class="font-semibold">Rating:</span>
+                                    <span>${rating} ⭐ (${movie.vote_count} votes)</span>
+                                </div>
+                                <div>
+                                    <span class="font-semibold">Runtime:</span>
+                                    <span>${movie.runtime ? `${movie.runtime} minutes` : 'N/A'}</span>
+                                </div>
+                                <div>
+                                    <span class="font-semibold">Genres:</span>
+                                    <span>${movie.genres ? movie.genres.join(', ') : 'N/A'}</span>
+                                </div>
+                            </div>
+                            ${movie.videos && movie.videos.length > 0 ? `
+                                <div class="mt-4">
+                                    <h3 class="text-lg font-semibold mb-2">Trailers</h3>
+                                    <div class="flex gap-2 overflow-x-auto">
+                                        ${movie.videos.slice(0, 3).map(video => `
+                                            <a href="https://www.youtube.com/watch?v=${video.key}" 
+                                               target="_blank" 
+                                               class="flex items-center gap-2 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                                                <i class="fab fa-youtube"></i>
+                                                Watch Trailer
+                                            </a>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
                 </div>
             `;
-
-            modal.classList.remove('hidden');
+            
+            document.getElementById('movieModal').classList.remove('hidden');
         } catch (error) {
-            console.error('Error:', error);
-            alert('Failed to load movie details');
+            console.error('Error fetching movie details:', error);
         }
     }
 
     function closeModal() {
-        const modal = document.getElementById('movieModal');
-        modal.classList.add('hidden');
+        document.getElementById('movieModal').classList.add('hidden');
         currentMovie = null;
     }
 
     async function downloadMovie() {
         if (!currentMovie) return;
-
-        const statusDiv = document.createElement('div');
-        statusDiv.className = 'mt-4 text-center';
-        statusDiv.innerHTML = '<div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto"></div><p class="mt-2">Starting download...</p>';
-        document.getElementById('movieDetails').appendChild(statusDiv);
-
+        
+        const downloadBtn = document.querySelector('[onclick="downloadMovie()"]');
+        const originalText = downloadBtn.innerHTML;
+        downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+        downloadBtn.disabled = true;
+        
         try {
-            const response = await fetch('/download', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ movie_id: currentMovie.id })
+            const response = await fetch(`/download_movie/${currentMovie.id}`, {
+                method: 'POST'
             });
-
-            if (!response.ok) throw new Error('Download request failed');
-            const result = await response.json();
-
-            if (result.success) {
-                statusDiv.innerHTML = '<p class="text-green-500">Download completed successfully!</p>';
+            
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                // Display provider information
+                const providersDiv = document.createElement('div');
+                providersDiv.className = 'mt-4 p-4 bg-gray-50 rounded-lg';
+                providersDiv.innerHTML = `
+                    <h3 class="text-lg font-semibold mb-2">Available Streaming Options</h3>
+                    <div class="space-y-2">
+                        ${data.movie.providers.map(provider => `
+                            <div class="flex items-center justify-between p-2 bg-white rounded border">
+                                <span>${provider.name}</span>
+                                <span class="px-2 py-1 text-sm rounded ${
+                                    provider.type === 'stream' ? 'bg-green-100 text-green-800' :
+                                    provider.type === 'rent' ? 'bg-blue-100 text-blue-800' :
+                                    'bg-purple-100 text-purple-800'
+                                }">${provider.type}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <p class="mt-4 text-sm text-gray-600">
+                        Visit these streaming platforms to watch "${data.movie.title}"
+                    </p>
+                `;
+                
+                document.getElementById('movieDetails').appendChild(providersDiv);
+                downloadBtn.style.display = 'none';
             } else {
-                throw new Error(result.error || 'Download failed');
+                throw new Error(data.message || 'Failed to get streaming information');
             }
         } catch (error) {
-            statusDiv.innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
+            console.error('Error:', error);
+            alert('Error: ' + error.message);
+        } finally {
+            downloadBtn.innerHTML = originalText;
+            downloadBtn.disabled = false;
         }
     }
 
     // Initialize when DOM is ready
     document.addEventListener('DOMContentLoaded', () => {
         searchMovies();
+    });
+
+    // Handle Enter key in search input
+    document.getElementById('searchInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            currentPage = 1;  // Reset to first page on new search
+            searchMovies();
+        }
     });
 </script>
 {% endblock %}

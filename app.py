@@ -11,15 +11,33 @@ from bs4 import BeautifulSoup
 import re
 from urllib.parse import urljoin
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key-here'  # Change this to a secure secret key
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 CORS(app)
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
+
+# TMDB API Configuration
+TMDB_API_KEY = os.getenv('TMDB_API_KEY')
+TMDB_ACCESS_TOKEN = os.getenv('TMDB_ACCESS_TOKEN')
+
+if not TMDB_API_KEY or not TMDB_ACCESS_TOKEN:
+    raise ValueError("TMDB_API_KEY and TMDB_ACCESS_TOKEN must be set in .env file")
+
+TMDB_BASE_URL = "https://api.themoviedb.org/3"
+TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/original"
+TMDB_HEADERS = {
+    'Authorization': f'Bearer {TMDB_ACCESS_TOKEN}',
+    'Content-Type': 'application/json;charset=utf-8'
+}
 
 # Configure download directory
 DOWNLOAD_FOLDER = 'downloads'
@@ -57,235 +75,208 @@ class Download(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-def get_sample_movies():
-    return [
-        {
-            'id': 'night-of-the-living-dead',
-            'title': 'Night of the Living Dead (1968)',
-            'overview': 'A classic horror film directed by George A. Romero. A group of people hide from bloodthirsty zombies in a farmhouse.',
-            'poster_path': 'https://archive.org/download/night_of_the_living_dead/format=Thumbnail',
-            'release_date': '1968',
-            'vote_average': 4.5,
-            'download_url': 'https://archive.org/details/night_of_the_living_dead'
-        },
-        {
-            'id': 'metropolis',
-            'title': 'Metropolis (1927)',
-            'overview': 'In a futuristic city sharply divided between the working class and the city planners, the son of the city\'s mastermind falls in love with a working class prophet.',
-            'poster_path': 'https://archive.org/download/metropolis1927germanversion/format=Thumbnail',
-            'release_date': '1927',
-            'vote_average': 4.8,
-            'download_url': 'https://archive.org/details/metropolis1927germanversion'
-        },
-        {
-            'id': 'nosferatu',
-            'title': 'Nosferatu (1922)',
-            'overview': 'Vampire Count Orlok expresses interest in a new residence and real estate agent Hutter\'s wife. Silent horror film by F. W. Murnau.',
-            'poster_path': 'https://archive.org/download/Nosferatu_201604/format=Thumbnail',
-            'release_date': '1922',
-            'vote_average': 4.7,
-            'download_url': 'https://archive.org/details/Nosferatu_201604'
-        },
-        {
-            'id': 'the-general',
-            'title': 'The General (1926)',
-            'overview': 'When Union spies steal an engineer\'s beloved locomotive, he pursues it single-handedly and straight through enemy lines. Starring Buster Keaton.',
-            'poster_path': 'https://archive.org/download/TheGeneral_981/format=Thumbnail',
-            'release_date': '1926',
-            'vote_average': 4.6,
-            'download_url': 'https://archive.org/details/TheGeneral_981'
-        },
-        {
-            'id': 'plan-9-from-outer-space',
-            'title': 'Plan 9 from Outer Space (1959)',
-            'overview': 'Aliens resurrect dead humans as zombies and vampires to stop humanity from creating the Solaranite (a sort of sun-driven bomb).',
-            'poster_path': 'https://archive.org/download/Plan9FromOuterSpace_657/format=Thumbnail',
-            'release_date': '1959',
-            'vote_average': 3.5,
-            'download_url': 'https://archive.org/details/Plan9FromOuterSpace_657'
-        },
-        {
-            'id': 'little-shop-of-horrors',
-            'title': 'The Little Shop of Horrors (1960)',
-            'overview': 'A clumsy young man nurtures a plant and discovers it\'s carnivorous, forcing him to kill to feed it.',
-            'poster_path': 'https://archive.org/download/little_shop_of_horrors/format=Thumbnail',
-            'release_date': '1960',
-            'vote_average': 4.2,
-            'download_url': 'https://archive.org/details/little_shop_of_horrors'
-        },
-        {
-            'id': 'his-girl-friday',
-            'title': 'His Girl Friday (1940)',
-            'overview': 'A newspaper editor uses every trick in the book to keep his ace reporter ex-wife from remarrying.',
-            'poster_path': 'https://archive.org/download/his_girl_friday/format=Thumbnail',
-            'release_date': '1940',
-            'vote_average': 4.6,
-            'download_url': 'https://archive.org/details/his_girl_friday'
-        },
-        {
-            'id': 'charade',
-            'title': 'Charade (1963)',
-            'overview': 'Romance and suspense ensue in Paris as a woman is pursued by several men who want a fortune her murdered husband had stolen. Starring Audrey Hepburn and Cary Grant.',
-            'poster_path': 'https://archive.org/download/charade_202006/format=Thumbnail',
-            'release_date': '1963',
-            'vote_average': 4.7,
-            'download_url': 'https://archive.org/details/charade_202006'
-        },
-        {
-            'id': 'carnival-of-souls',
-            'title': 'Carnival of Souls (1962)',
-            'overview': 'After a traumatic accident, a woman becomes drawn to a mysterious abandoned carnival.',
-            'poster_path': 'https://archive.org/download/carnival_of_souls/format=Thumbnail',
-            'release_date': '1962',
-            'vote_average': 4.3,
-            'download_url': 'https://archive.org/details/carnival_of_souls'
-        },
-        {
-            'id': 'the-kid',
-            'title': 'The Kid (1921)',
-            'overview': 'The Tramp cares for an abandoned child, but events put their relationship in jeopardy. Charlie Chaplin\'s first full-length film.',
-            'poster_path': 'https://archive.org/download/the_kid_chaplin/format=Thumbnail',
-            'release_date': '1921',
-            'vote_average': 4.8,
-            'download_url': 'https://archive.org/details/the_kid_chaplin'
-        },
-        {
-            'id': 'the-phantom-of-the-opera',
-            'title': 'The Phantom of the Opera (1925)',
-            'overview': 'A mad, disfigured composer seeks love with a lovely young opera singer.',
-            'poster_path': 'https://archive.org/download/phantom_of_the_opera/format=Thumbnail',
-            'release_date': '1925',
-            'vote_average': 4.5,
-            'download_url': 'https://archive.org/details/phantom_of_the_opera'
-        },
-        {
-            'id': 'dementia-13',
-            'title': 'Dementia 13 (1963)',
-            'overview': 'A widow deceives her late husband\'s family about his death, but then a series of brutal axe murders begins. Francis Ford Coppola\'s directorial debut.',
-            'poster_path': 'https://archive.org/download/dementia_13/format=Thumbnail',
-            'release_date': '1963',
-            'vote_average': 4.0,
-            'download_url': 'https://archive.org/details/dementia_13'
-        }
-    ]
-
-def scrape_movies(query=None, page=1):
+def get_movie_details(movie_id):
     try:
-        if not query:
-            # Return sample movies when no search query is provided
-            return get_sample_movies()
-            
-        if query:
-            url = f"{BASE_URL}?query={query}&page={page}"
-        else:
-            # For the initial page load, show movies from the featured section
-            url = f"{BASE_URL}/movies?&sort=-downloads"
+        # Get movie details
+        url = f"https://api.themoviedb.org/3/movie/{movie_id}"
+        params = {
+            'append_to_response': 'videos,watch/providers',
+            'language': 'en-US'
+        }
+        headers = {
+            'Authorization': f'Bearer {TMDB_ACCESS_TOKEN}',
+            'accept': 'application/json'
+        }
         
-        print(f"Fetching movies from URL: {url}")  # Debug log
-        response = requests.get(url, headers=HEADERS)
-        print(f"Response status code: {response.status_code}")  # Debug log
+        response = requests.get(url, params=params, headers=headers)
+        response.raise_for_status()
+        movie_data = response.json()
         
-        if response.status_code != 200:
-            print(f"Error response: {response.text}")  # Debug log
-            return []
-            
-        soup = BeautifulSoup(response.text, 'lxml')
-        movies = []
-        items = soup.select('.C234')  # Updated selector for movie items
-        print(f"Found {len(items)} movie items")  # Debug log
+        # Get watch providers
+        providers_data = movie_data.get('watch/providers', {}).get('results', {}).get('US', {})
+        streaming = providers_data.get('flatrate', [])
+        rent = providers_data.get('rent', [])
+        buy = providers_data.get('buy', [])
         
-        for item in items[:20]:
-            try:
-                title_elem = item.select_one('.tile-title')
-                if not title_elem:
-                    continue
-                    
-                title = title_elem.text.strip()
-                link = item.select_one('a')
-                link_url = link['href'] if link else None
-                full_url = urljoin(BASE_URL, link_url) if link_url else None
-                
-                # Get thumbnail
-                thumbnail = item.select_one('img')
-                thumbnail_url = thumbnail['src'] if thumbnail and 'src' in thumbnail.attrs else None
-                
-                # Get description
-                description = item.select_one('.tile-description')
-                overview = description.text.strip() if description else 'No description available'
-                
-                # Get year from title or metadata
-                year_match = re.search(r'\b(19|20)\d{2}\b', title)
-                year = year_match.group(0) if year_match else 'N/A'
-                
-                movie_data = {
-                    'id': link_url.split('/')[-1] if link_url else '',
-                    'title': title,
-                    'overview': overview,
-                    'poster_path': thumbnail_url,
-                    'release_date': year,
-                    'vote_average': 0,
-                    'download_url': full_url
-                }
-                movies.append(movie_data)
-                print(f"Added movie: {title}")  # Debug log
-                
-            except Exception as e:
-                print(f"Error processing movie item: {str(e)}")  # Debug log
-                continue
-                
-        return movies
+        # Format provider data
+        all_providers = []
+        if streaming:
+            all_providers.extend([{'name': p['provider_name'], 'type': 'stream'} for p in streaming])
+        if rent:
+            all_providers.extend([{'name': p['provider_name'], 'type': 'rent'} for p in rent])
+        if buy:
+            all_providers.extend([{'name': p['provider_name'], 'type': 'buy'} for p in buy])
+        
+        # Get trailer
+        trailers = []
+        if 'videos' in movie_data and movie_data['videos']['results']:
+            for video in movie_data['videos']['results']:
+                if video['type'] == 'Trailer' and video['site'] == 'YouTube':
+                    trailers.append({
+                        'name': video['name'],
+                        'key': video['key'],
+                        'site': video['site']
+                    })
+        
+        # Format the response
+        formatted_data = {
+            'id': movie_data['id'],
+            'title': movie_data['title'],
+            'original_title': movie_data['original_title'],
+            'overview': movie_data['overview'],
+            'poster_path': f"https://image.tmdb.org/t/p/w500{movie_data['poster_path']}" if movie_data['poster_path'] else None,
+            'backdrop_path': f"https://image.tmdb.org/t/p/original{movie_data['backdrop_path']}" if movie_data['backdrop_path'] else None,
+            'release_date': movie_data['release_date'],
+            'vote_average': movie_data['vote_average'],
+            'vote_count': movie_data['vote_count'],
+            'runtime': movie_data['runtime'],
+            'status': movie_data['status'],
+            'tagline': movie_data['tagline'],
+            'genres': [genre['name'] for genre in movie_data['genres']],
+            'production_companies': [company['name'] for company in movie_data['production_companies']],
+            'videos': trailers,
+            'providers': all_providers
+        }
+        
+        return formatted_data
     except Exception as e:
-        print(f"Error in scrape_movies: {str(e)}")  # Debug log
-        return []
+        print(f"Error fetching movie details: {str(e)}")
+        return None
+
+@app.route('/')
+def index():
+    query = request.args.get('query', '')
+    page = request.args.get('page', 1, type=int)
+    search_results = search_movies(query, page)
+    return render_template('index.html', 
+                         movies=search_results['results'], 
+                         query=query,
+                         current_page=search_results['page'],
+                         total_pages=search_results['total_pages'])
 
 @app.route('/search_movies')
-@login_required
-def search_movies():
+def search_movies_route():
     try:
         query = request.args.get('query', '')
         page = request.args.get('page', 1, type=int)
-        movies = scrape_movies(query, page)
-        print(f"Returning {len(movies)} movies")  # Debug log
-        return jsonify(movies)
-    except Exception as e:
-        print(f"Error in search_movies route: {str(e)}")  # Debug log
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/movie/<movie_id>')
-@login_required
-def get_movie_details(movie_id):
-    try:
-        url = f"{BASE_URL}/{movie_id}"
-        response = requests.get(url, headers=HEADERS)
-        soup = BeautifulSoup(response.text, 'lxml')
         
-        title = soup.select_one('h1').text.strip() if soup.select_one('h1') else 'Unknown Title'
-        description = soup.select_one('.description')
-        overview = description.text.strip() if description else 'No description available'
+        # Determine which endpoint to use
+        if query:
+            endpoint = f"{TMDB_BASE_URL}/search/movie"
+            params = {
+                'query': query,
+                'page': page,
+                'include_adult': False,
+                'language': 'en-US'
+            }
+        else:
+            endpoint = f"{TMDB_BASE_URL}/movie/popular"
+            params = {
+                'page': page,
+                'language': 'en-US'
+            }
         
-        # Get metadata
-        metadata = soup.select('.metadata-definition')
-        info = {}
-        for meta in metadata:
-            key = meta.select_one('.metadata-definition-label')
-            value = meta.select_one('.metadata-definition-value')
-            if key and value:
-                info[key.text.strip()] = value.text.strip()
+        # Make the API request
+        response = requests.get(endpoint, params=params, headers=TMDB_HEADERS)
+        
+        # Check for specific error responses
+        if response.status_code == 401:
+            print("Authentication failed. Check your API key and token.")
+            return jsonify({'error': 'Authentication failed'}), 401
+        elif response.status_code == 404:
+            print("Resource not found.")
+            return jsonify({'error': 'Resource not found'}), 404
+        
+        # Raise for other status codes
+        response.raise_for_status()
+        data = response.json()
+        
+        # Format the movies data
+        movies = []
+        for movie in data.get('results', []):
+            poster_path = movie.get('poster_path')
+            backdrop_path = movie.get('backdrop_path')
+            
+            movies.append({
+                'id': movie['id'],
+                'title': movie['title'],
+                'overview': movie['overview'],
+                'poster_path': f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None,
+                'backdrop_path': f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else None,
+                'release_date': movie.get('release_date'),
+                'vote_average': movie.get('vote_average'),
+                'vote_count': movie.get('vote_count')
+            })
         
         return jsonify({
-            'id': movie_id,
-            'title': title,
-            'overview': overview,
-            'metadata': info,
-            'download_url': f"{url}/download"
+            'results': movies,
+            'page': data.get('page', 1),
+            'total_pages': data.get('total_pages', 1),
+            'total_results': data.get('total_results', 0)
         })
+        
+    except requests.exceptions.RequestException as e:
+        print(f"TMDB API error: {str(e)}")
+        return jsonify({'error': 'Failed to fetch movies from TMDB'}), 500
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        return jsonify({'error': 'An unexpected error occurred'}), 500
+
+@app.route('/movie/<movie_id>')
+def movie_details(movie_id):
+    try:
+        movie_data = get_movie_details(movie_id)
+        if movie_data:
+            return jsonify(movie_data)
+        return jsonify({'error': 'Movie not found'}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/')
+@app.route('/download_movie/<movie_id>', methods=['POST'])
 @login_required
-def index():
-    return render_template('index.html', username=current_user.username)
+def download_movie(movie_id):
+    try:
+        # Get movie details from TMDB
+        movie_details = get_movie_details(movie_id)
+        if not movie_details:
+            return jsonify({'status': 'error', 'message': 'Movie not found'}), 404
+
+        # Check if movie has streaming providers
+        if not movie_details.get('providers'):
+            return jsonify({'status': 'error', 'message': 'No streaming providers available for this movie'}), 400
+
+        # Get provider URLs and information
+        providers = movie_details['providers']
+        provider_info = []
+        for provider in providers:
+            provider_info.append({
+                'name': provider['name'],
+                'type': provider['type']
+            })
+
+        # Record the request in database
+        download = Download(
+            user_id=current_user.id,
+            movie_title=movie_details['title'],
+            status='pending'
+        )
+        db.session.add(download)
+        db.session.commit()
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Movie information retrieved',
+            'movie': {
+                'title': movie_details['title'],
+                'providers': provider_info,
+                'release_date': movie_details['release_date'],
+                'overview': movie_details['overview']
+            }
+        })
+
+    except Exception as e:
+        print(f"Error in download_movie: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -409,22 +400,79 @@ def profile():
                          message=message,
                          error=error)
 
-@app.route('/download/<int:movie_id>', methods=['POST'])
-@login_required
-def download_movie(movie_id):
+def search_movies(query=None, page=1):
+    """Search for movies or get popular movies if no query is provided."""
+    if query:
+        url = f"{TMDB_BASE_URL}/search/movie"
+    else:
+        url = f"{TMDB_BASE_URL}/movie/popular"
+    
+    params = {
+        'api_key': TMDB_API_KEY,
+        'language': 'en-US',
+        'page': page,
+        'include_adult': False  # Filter out adult content
+    }
+    
+    if query:
+        params['query'] = query
+    
     try:
-        # Add download record
-        download = Download(
-            user_id=current_user.id,
-            movie_title=request.form.get('movie_title', 'Unknown Movie'),
-            status='completed'
-        )
-        db.session.add(download)
-        db.session.commit()
-        
-        return jsonify({'success': True, 'message': 'Download started successfully'})
+        response = requests.get(url, headers=TMDB_HEADERS)
+        if response.status_code == 200:
+            data = response.json()
+            movies = []
+            for movie in data['results']:
+                movies.append({
+                    'id': movie['id'],
+                    'title': movie['title'],
+                    'overview': movie['overview'],
+                    'poster_path': f"{TMDB_IMAGE_BASE_URL}{movie['poster_path']}" if movie.get('poster_path') else None,
+                    'backdrop_path': f"{TMDB_IMAGE_BASE_URL}{movie['backdrop_path']}" if movie.get('backdrop_path') else None,
+                    'release_date': movie.get('release_date', 'N/A'),
+                    'vote_average': movie.get('vote_average', 0),
+                    'vote_count': movie.get('vote_count', 0),
+                    'popularity': movie.get('popularity', 0),
+                    'original_language': movie.get('original_language'),
+                    'genre_ids': movie.get('genre_ids', [])
+                })
+            return {
+                'results': movies,
+                'page': data['page'],
+                'total_pages': data['total_pages'],
+                'total_results': data['total_results']
+            }
+        elif response.status_code == 401:
+            print("Authentication failed. Please check your API key.")
+            return {'results': [], 'page': 1, 'total_pages': 1, 'total_results': 0}
+        elif response.status_code == 429:
+            print("Rate limit exceeded. Please wait before making more requests.")
+            return {'results': [], 'page': 1, 'total_pages': 1, 'total_results': 0}
+        else:
+            print(f"Error searching movies: {response.status_code}")
+            return {'results': [], 'page': 1, 'total_pages': 1, 'total_results': 0}
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
+        print(f"Error searching movies: {e}")
+        return {'results': [], 'page': 1, 'total_pages': 1, 'total_results': 0}
+
+@app.route('/download_status/<video_id>')
+@login_required
+def download_status(video_id):
+    try:
+        # Check if the download exists in the database
+        download = Download.query.filter_by(
+            user_id=current_user.id
+        ).order_by(Download.date.desc()).first()
+
+        if download:
+            return jsonify({
+                'status': download.status,
+                'title': download.movie_title,
+                'date': download.date.isoformat()
+            })
+        return jsonify({'status': 'not_found'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 with app.app_context():
     db.create_all()
